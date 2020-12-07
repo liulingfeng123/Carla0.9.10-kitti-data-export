@@ -98,6 +98,7 @@ class SynchronyModel(object):
         return num_existing_data_files
 
     def tick(self, timeout):
+        # Drive the simulator to the next frame and get the data of the current frame
         self.frame = self.world.tick()
         data = [self._retrieve_data(q, timeout) for q in self._queues]
         assert all(x.frame == self.frame for x in data)
@@ -129,12 +130,11 @@ class SynchronyModel(object):
         return world, init_setting, client, traffic_manager
 
     def _span_player(self):
+        """create our target vehicle"""
         my_vehicle_bp = random.choice(self.blueprint_library.filter("vehicle.lincoln.mkz2017"))
-
-        location = carla.Location(-17.8, 120.4, 0.5)
-        rotation = carla.Rotation(0, 37, 0)
+        location = carla.Location(190, 10, 0.5)
+        rotation = carla.Rotation(0, 0, 0)
         transform_vehicle = carla.Transform(location, rotation)
-
         my_vehicle = self.world.spawn_actor(my_vehicle_bp, transform_vehicle)
         k, my_camera = self._span_sensor(my_vehicle)
         self.actor_list.append(my_vehicle)
@@ -142,6 +142,7 @@ class SynchronyModel(object):
         return k, my_camera
 
     def _span_sensor(self, player):
+        """create camera, depth camera and lidar and attach to the target vehicle"""
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_d_bp = self.blueprint_library.find('sensor.camera.depth')
         lidar_bp = self.blueprint_library.find('sensor.lidar.ray_cast')
@@ -174,6 +175,7 @@ class SynchronyModel(object):
         self.sensors.append(my_camera_d)
         self.sensors.append(my_lidar)
 
+        # camera intrinsic
         k = np.identity(3)
         k[0, 2] = WINDOW_WIDTH_HALF
         k[1, 2] = WINDOW_HEIGHT_HALF
@@ -182,6 +184,7 @@ class SynchronyModel(object):
         return k, my_camera
 
     def _span_non_player(self):
+        """create autonomous vehicles and people"""
         blueprints = self.world.get_blueprint_library().filter(FILTERV)
         blueprints = [x for x in blueprints if int(x.get_attribute('number_of_wheels')) == 4]
         blueprints = [x for x in blueprints if not x.id.endswith('isetta')]
@@ -313,6 +316,7 @@ class SynchronyModel(object):
         print('spawned %d walkers and %d vehicles, press Ctrl+C to exit.' % (len(walkers_id), len(vehicles_id)))
 
     def _save_training_files(self, datapoints, point_cloud):
+        """ Save data in Kitti dataset format """
         logging.info("Attempting to save at frame no {}, frame no: {}".format(self.frame, self.captured_frame_no))
         groundplane_fname = GROUNDPLANE_PATH.format(self.captured_frame_no)
         lidar_fname = LIDAR_PATH.format(self.captured_frame_no)
@@ -412,8 +416,7 @@ def main():
                     # points = np.dot(sync_mode.player.get_transform().get_matrix(), points.T).T
                     # points = points[:, :-1]
                     # points[:, 2] -= LIDAR_HEIGHT_POS
-                    # point_cloud = np.matmul(rotRP, points.T).T
-                    # sync_mode._save_training_files(datapoints, points)
+                    sync_mode._save_training_files(datapoints, points)
                     sync_mode.captured_frame_no += 1
 
                 step = step+1
